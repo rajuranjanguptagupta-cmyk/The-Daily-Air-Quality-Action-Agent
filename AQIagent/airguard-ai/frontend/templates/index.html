@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AirGuard AI – Daily Air Quality Action Agent</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <!-- Chart.js — local copy (no CDN required) -->
+  <script src="/static/js/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo">
+      <span class="logo-icon">🛡️</span>
+      <span class="logo-text">AirGuard <span class="accent">AI</span></span>
+    </div>
+    <span class="tagline">Daily Air Quality Action Agent</span>
+  </div>
+  <div class="header-center">
+    <select id="citySelect" class="city-select" title="Select city">
+      <option value="bhilai">📍 Bhilai, CG</option>
+      <option value="raipur">📍 Raipur, CG</option>
+      <option value="delhi">📍 Delhi</option>
+      <option value="mumbai">📍 Mumbai</option>
+    </select>
+    <button class="btn-icon" id="geoBtn" title="Use my location">📡</button>
+    <span id="currentDate" class="date-badge"></span>
+  </div>
+  <div class="header-right">
+    <button class="btn-primary" id="refreshBtn">🔄 Refresh AQI</button>
+    <button class="btn-icon" id="themeBtn" title="Toggle dark mode">🌙</button>
+    <button class="btn-nav" onclick="showSection('profile')">👤 Profile</button>
+    <button class="btn-nav" onclick="showSection('analytics')">📊 Analytics</button>
+    <button class="btn-nav" onclick="showSection('architecture')">🏗️ Architecture</button>
+  </div>
+</header>
+
+<!-- ===== DEMO MODE BANNER ===== -->
+<div id="demoBanner" class="demo-banner">
+  🧪 <strong>Demo Mode Active</strong> — Using realistic sample data. Configure API keys in <code>.env</code> for live data.
+  <button onclick="document.getElementById('demoBanner').style.display='none'" class="close-btn">✕</button>
+</div>
+
+<!-- ===== ALERT BANNER ===== -->
+<div id="alertBanner" class="alert-banner" style="display:none">
+  <span id="alertText">⚠️ AQI Alert</span>
+  <button onclick="document.getElementById('alertBanner').style.display='none'" class="close-btn">✕</button>
+</div>
+
+<!-- ===== MAIN DASHBOARD ===== -->
+<main id="sectionDashboard" class="section active">
+  <div class="container">
+
+    <!-- AQI Card + Pollutants -->
+    <div class="grid-3-1">
+
+      <!-- Main AQI Card -->
+      <div class="card aqi-card" id="aqiCard">
+        <div class="aqi-gauge-wrap">
+          <canvas id="aqiGauge" width="200" height="120"></canvas>
+          <div class="aqi-center-text">
+            <span id="aqiValue" class="aqi-number">--</span>
+            <span id="aqiCategory" class="aqi-category">Loading...</span>
+          </div>
+        </div>
+        <div class="aqi-meta">
+          <div class="meta-row"><span class="meta-label">Risk Level</span><span id="riskLevel" class="badge">--</span></div>
+          <div class="meta-row"><span class="meta-label">Main Pollutant</span><span id="mainPollutant" class="badge">--</span></div>
+          <div class="meta-row"><span class="meta-label">City</span><span id="cityName" class="badge">--</span></div>
+          <div class="meta-row"><span class="meta-label">Updated</span><span id="lastUpdated" class="muted">--</span></div>
+        </div>
+        <p id="aqiInterpretation" class="aqi-interpretation muted"></p>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+          <div id="demoTag" class="demo-tag" style="display:none">📊 Demo Data</div>
+          <div id="groqTag" class="groq-tag" style="display:none">🤖 Groq AI Active</div>
+        </div>
+      </div>
+
+      <!-- Pollutant Cards -->
+      <div class="pollutant-grid">
+        <div class="card pollutant-card">
+          <div class="poll-icon">🌫️</div>
+          <div class="poll-name">PM2.5</div>
+          <div class="poll-value" id="val-pm25">--</div>
+          <div class="poll-unit">μg/m³</div>
+          <div class="poll-bar"><div class="poll-fill" id="bar-pm25"></div></div>
+        </div>
+        <div class="card pollutant-card">
+          <div class="poll-icon">💨</div>
+          <div class="poll-name">PM10</div>
+          <div class="poll-value" id="val-pm10">--</div>
+          <div class="poll-unit">μg/m³</div>
+          <div class="poll-bar"><div class="poll-fill" id="bar-pm10"></div></div>
+        </div>
+        <div class="card pollutant-card">
+          <div class="poll-icon">🏭</div>
+          <div class="poll-name">NO₂</div>
+          <div class="poll-value" id="val-no2">--</div>
+          <div class="poll-unit">μg/m³</div>
+          <div class="poll-bar"><div class="poll-fill" id="bar-no2"></div></div>
+        </div>
+        <div class="card pollutant-card">
+          <div class="poll-icon">☀️</div>
+          <div class="poll-name">O₃</div>
+          <div class="poll-value" id="val-o3">--</div>
+          <div class="poll-unit">μg/m³</div>
+          <div class="poll-bar"><div class="poll-fill" id="bar-o3"></div></div>
+        </div>
+        <div class="card pollutant-card">
+          <div class="poll-icon">🚗</div>
+          <div class="poll-name">CO</div>
+          <div class="poll-value" id="val-co">--</div>
+          <div class="poll-unit">mg/m³</div>
+          <div class="poll-bar"><div class="poll-fill" id="bar-co"></div></div>
+        </div>
+        <div class="card pollutant-card">
+          <div class="poll-icon">🔥</div>
+          <div class="poll-name">SO₂</div>
+          <div class="poll-value" id="val-so2">--</div>
+          <div class="poll-unit">μg/m³</div>
+          <div class="poll-bar"><div class="poll-fill" id="bar-so2"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Health Advisory + Forecast -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <h3>🩺 Personalized Health Advisory</h3>
+          <button class="btn-sm" onclick="showSection('profile')">⚙️ My Profile</button>
+        </div>
+        <div id="healthVerdict" class="verdict-badge">Loading...</div>
+        <ul id="healthRecs" class="rec-list"></ul>
+        <p class="disclaimer-text" id="healthDisclaimer"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>📅 5-Day AQI Forecast</h3>
+          <span id="forecastNote" class="demo-tag" style="display:inline-block">📊 Demo</span>
+        </div>
+        <canvas id="forecastChart" height="160"></canvas>
+        <div id="forecastCards" class="forecast-row"></div>
+        <p id="preventiveAction" class="muted small-text" style="margin-top:8px"></p>
+      </div>
+    </div>
+
+    <!-- Community Actions + Daily Plan -->
+    <div class="grid-2">
+      <div class="card">
+        <h3>🌍 Community Actions</h3>
+        <p id="communitySummary" class="muted" style="margin-bottom:10px"></p>
+        <div id="communityList" class="community-grid"></div>
+      </div>
+
+      <div class="card daily-plan-card">
+        <h3>🤖 AI Daily Action Plan</h3>
+        <div id="dailyPlanLoading" class="plan-loading" style="display:none">
+          <div class="plan-spinner"></div><span>Generating with Groq AI...</span>
+        </div>
+        <div id="dailyPlan" class="daily-plan-text">Loading your personalized plan...</div>
+        <div class="workflow-badge">
+          <span>Powered by</span>
+          <strong id="planSourceBadge">AirGuard AI</strong>
+          <span>· IBM Orchestrate</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Policy Insights -->
+    <div class="card">
+      <h3>📋 Policy &amp; Awareness Insights</h3>
+      <div class="policy-grid">
+        <div class="policy-item"><span class="policy-label">Current Issue</span><p id="pol-issue">--</p></div>
+        <div class="policy-item"><span class="policy-label">Why It Matters</span><p id="pol-why">--</p></div>
+        <div class="policy-item"><span class="policy-label">Public Action</span><p id="pol-public">--</p></div>
+        <div class="policy-item"><span class="policy-label">Community Action</span><p id="pol-community">--</p></div>
+        <div class="policy-item full-width"><span class="policy-label">💬 Awareness Message</span><p id="pol-awareness">--</p></div>
+      </div>
+    </div>
+
+    <!-- How AI Works -->
+    <div class="card how-ai-card">
+      <h3>⚙️ How AirGuard AI Works</h3>
+      <div class="ai-steps">
+        <div class="ai-step"><div class="step-num">1</div><div class="step-text"><strong>Collect AQI Data</strong><br>Fetch real-time or demo AQI for your city</div></div>
+        <div class="ai-arrow">→</div>
+        <div class="ai-step"><div class="step-num">2</div><div class="step-text"><strong>Analyze Levels</strong><br>AQI Agent interprets pollution levels</div></div>
+        <div class="ai-arrow">→</div>
+        <div class="ai-step"><div class="step-num">3</div><div class="step-text"><strong>User Context</strong><br>Health Agent applies your profile</div></div>
+        <div class="ai-arrow">→</div>
+        <div class="ai-step"><div class="step-num">4</div><div class="step-text"><strong>Predict Risk</strong><br>Forecast Agent predicts 5 days</div></div>
+        <div class="ai-arrow">→</div>
+        <div class="ai-step"><div class="step-num">5</div><div class="step-text"><strong>Community Plan</strong><br>Community Agent suggests actions</div></div>
+        <div class="ai-arrow">→</div>
+        <div class="ai-step"><div class="step-num">6</div><div class="step-text"><strong>Groq AI</strong><br>qwen/qwen3.8-27b generates narrative</div></div>
+        <div class="ai-arrow">→</div>
+        <div class="ai-step"><div class="step-num">7</div><div class="step-text"><strong>Daily Plan</strong><br>IBM Orchestrate combines all results</div></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ===== PROFILE SECTION ===== -->
+<main id="sectionProfile" class="section">
+  <div class="container">
+    <div class="card" style="max-width:560px;margin:auto">
+      <h3>👤 My Profile</h3>
+      <p class="muted" style="margin-bottom:16px">Your profile helps AirGuard AI personalise recommendations. No sensitive medical information required.</p>
+      <form id="profileForm" class="profile-form">
+        <label>Name
+          <input type="text" id="p-name" placeholder="Your name (optional)" />
+        </label>
+        <label>Age Group
+          <select id="p-age">
+            <option value="child">Child (under 14)</option>
+            <option value="teenager">Teenager (14–18)</option>
+            <option value="adult" selected>Adult (18–60)</option>
+            <option value="senior">Senior (60–75)</option>
+            <option value="elderly">Elderly (75+)</option>
+          </select>
+        </label>
+        <label>City / Location
+          <select id="p-city">
+            <option value="bhilai">Bhilai</option>
+            <option value="raipur">Raipur</option>
+            <option value="delhi">Delhi</option>
+            <option value="mumbai">Mumbai</option>
+          </select>
+        </label>
+        <label>Outdoor Activity Level
+          <select id="p-activity">
+            <option value="sedentary">Sedentary (mostly indoors)</option>
+            <option value="light">Light (occasional walks)</option>
+            <option value="moderate" selected>Moderate (daily walking)</option>
+            <option value="active">Active (regular exercise)</option>
+            <option value="athlete">Athlete (intense daily training)</option>
+          </select>
+        </label>
+        <label>Health Sensitivity
+          <select id="p-sensitivity">
+            <option value="none" selected>None (generally healthy)</option>
+            <option value="mild">Mild (occasional allergies)</option>
+            <option value="moderate">Moderate (asthma / mild condition)</option>
+            <option value="high">High (chronic respiratory / heart)</option>
+            <option value="very_high">Very High (severe conditions)</option>
+          </select>
+        </label>
+        <div class="form-btns">
+          <button type="submit" class="btn-primary">💾 Save Profile</button>
+          <button type="button" class="btn-secondary" onclick="showSection('dashboard')">← Back to Dashboard</button>
+        </div>
+        <div id="profileMsg" class="profile-msg"></div>
+      </form>
+    </div>
+  </div>
+</main>
+
+<!-- ===== ANALYTICS SECTION ===== -->
+<main id="sectionAnalytics" class="section">
+  <div class="container">
+    <div class="card">
+      <div class="card-header">
+        <h3>📊 Analytics Dashboard</h3>
+        <button class="btn-secondary" onclick="showSection('dashboard')">← Back</button>
+      </div>
+      <div class="analytics-grid">
+        <div class="stat-card"><div class="stat-icon">📈</div><div class="stat-val" id="stat-avg">--</div><div class="stat-label">Average AQI</div></div>
+        <div class="stat-card"><div class="stat-icon">🔴</div><div class="stat-val" id="stat-max">--</div><div class="stat-label">Highest AQI</div></div>
+        <div class="stat-card"><div class="stat-icon">🟢</div><div class="stat-val" id="stat-min">--</div><div class="stat-label">Lowest AQI</div></div>
+        <div class="stat-card"><div class="stat-icon">🌫️</div><div class="stat-val" id="stat-poll">--</div><div class="stat-label">Common Pollutant</div></div>
+        <div class="stat-card"><div class="stat-icon">⚠️</div><div class="stat-val" id="stat-alerts">--</div><div class="stat-label">Alerts Generated</div></div>
+        <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-val" id="stat-total">--</div><div class="stat-label">Total Readings</div></div>
+      </div>
+      <div class="chart-wrap">
+        <h4 style="font-size:13px;margin-bottom:10px;color:var(--muted)">AQI Trend (Recent Readings)</h4>
+        <canvas id="analyticsChart" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ===== ARCHITECTURE SECTION ===== -->
+<main id="sectionArchitecture" class="section">
+  <div class="container">
+    <div class="card">
+      <div class="card-header">
+        <h3>🏗️ System Architecture — IBM + Groq Integration</h3>
+        <button class="btn-secondary" onclick="showSection('dashboard')">← Back</button>
+      </div>
+      <div class="arch-diagram">
+        <div class="arch-layer frontend-layer">
+          <strong>🖥️ Frontend</strong>
+          <span>HTML · CSS · JavaScript · Chart.js (local)</span>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-layer backend-layer">
+          <strong>⚙️ Backend API (Flask / Python)</strong>
+          <span>/api/aqi · /api/forecast · /api/chat · /api/dashboard · /api/analytics</span>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-layer ibm-layer">
+          <strong>🔷 IBM Orchestrate</strong>
+          <span>Multi-agent workflow coordination &amp; task routing</span>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-layer agents-layer">
+          <strong>🤖 Multi-Agent Workflow</strong>
+          <div class="agents-row">
+            <span class="agent-badge">AQI Agent</span>
+            <span class="agent-badge">Health Agent</span>
+            <span class="agent-badge">Forecast Agent</span>
+            <span class="agent-badge">Community Agent</span>
+            <span class="agent-badge">Orchestrator</span>
+          </div>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-layer langflow-layer">
+          <strong>🔵 IBM Langflow</strong>
+          <span>Visual AI workflow builder — agent pipeline &amp; prompt chaining</span>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-layer groq-layer">
+          <strong>⚡ Groq AI — qwen/qwen3.8-27b (Active)</strong>
+          <span>LLM reasoning · Chat answers · Daily plan generation · Ultra-fast inference</span>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-layer watsonx-layer">
+          <strong>🧠 IBM watsonx / Granite Models (Optional)</strong>
+          <span>Enterprise LLM fallback — configure IBM_WATSONX_API_KEY to enable</span>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-layer data-layer">
+          <strong>📡 Data Sources</strong>
+          <span>WAQI API · Mock Demo Data · RAG Knowledge Base (20 docs) · SQLite DB</span>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-layer output-layer">
+          <strong>📋 Final Output</strong>
+          <span>AI Daily Action Plan · Health Advisory · Forecast · Community Actions</span>
+        </div>
+      </div>
+      <div class="ibm-note">
+        <h4>🔑 Current Configuration</h4>
+        <div class="config-status">
+          <div class="config-row active"><span class="cfg-dot"></span><strong>Groq AI</strong> — Active (qwen/qwen3.8-27b)</div>
+          <div class="config-row active"><span class="cfg-dot"></span><strong>Demo AQI Data</strong> — Active (4 cities)</div>
+          <div class="config-row active"><span class="cfg-dot"></span><strong>RAG Knowledge Base</strong> — Active (20 documents)</div>
+          <div class="config-row active"><span class="cfg-dot"></span><strong>SQLite Database</strong> — Active</div>
+          <div class="config-row inactive"><span class="cfg-dot inactive"></span><strong>WAQI Live API</strong> — Configure WAQI_TOKEN in .env</div>
+          <div class="config-row inactive"><span class="cfg-dot inactive"></span><strong>IBM watsonx</strong> — Configure IBM_WATSONX_API_KEY in .env</div>
+        </div>
+        <p style="margin-top:14px;font-size:13px;color:var(--muted)">Add keys to <code>airguard-ai/.env</code> to enable live services.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ===== CHAT WIDGET ===== -->
+<div id="chatWidget" class="chat-widget">
+  <div class="chat-header" onclick="toggleChat()">
+    <span>🤖 Ask AirGuard AI <span class="chat-model-badge">Groq</span></span>
+    <span id="chatToggleIcon">▲</span>
+  </div>
+  <div id="chatBody" class="chat-body">
+    <div id="chatMessages" class="chat-messages">
+      <div class="chat-msg bot">
+        <strong>AirGuard AI:</strong> Hello! I'm powered by Groq AI. Ask me anything about air quality, health precautions, pollutants, or community actions!
+      </div>
+      <div class="chat-suggestions">
+        <button class="suggestion-btn" onclick="sendSuggestion('Can I exercise outside today?')">Can I exercise outside today?</button>
+        <button class="suggestion-btn" onclick="sendSuggestion('What does today\'s AQI mean?')">What does today's AQI mean?</button>
+        <button class="suggestion-btn" onclick="sendSuggestion('Why is PM2.5 dangerous?')">Why is PM2.5 dangerous?</button>
+        <button class="suggestion-btn" onclick="sendSuggestion('How can our community reduce pollution?')">How can we reduce pollution?</button>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="chatInput" placeholder="Ask about air quality..." />
+      <button class="btn-primary" id="chatSendBtn" onclick="sendChat()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LOADING OVERLAY ===== -->
+<div id="loadingOverlay" class="loading-overlay" style="display:none">
+  <div class="spinner"></div>
+  <p>Loading AQI data...</p>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

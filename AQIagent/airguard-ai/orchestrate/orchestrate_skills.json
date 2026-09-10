@@ -1,0 +1,129 @@
+{
+  "name": "AirGuard AI — IBM Orchestrate Integration",
+  "description": "IBM Orchestrate skill and automation definitions for AirGuard AI multi-agent workflow.",
+  "version": "1.0.0",
+  "skills": [
+    {
+      "skill_id": "airguard_fetch_aqi",
+      "name": "Fetch AQI Data",
+      "description": "Fetches current AQI data for a given city",
+      "endpoint": "/api/aqi",
+      "method": "GET",
+      "parameters": [
+        { "name": "city", "type": "string", "required": true, "description": "City name (e.g. bhilai, delhi)" }
+      ],
+      "output_schema": {
+        "aqi": "integer",
+        "category": "string",
+        "city": "string",
+        "pollutants": "object"
+      }
+    },
+    {
+      "skill_id": "airguard_health_advisory",
+      "name": "Get Health Advisory",
+      "description": "Generates personalized health recommendations based on AQI and user profile",
+      "endpoint": "/api/recommendation",
+      "method": "POST",
+      "parameters": [
+        { "name": "city",        "type": "string",  "required": true  },
+        { "name": "age_group",   "type": "string",  "required": false },
+        { "name": "activity",    "type": "string",  "required": false },
+        { "name": "sensitivity", "type": "string",  "required": false }
+      ],
+      "output_schema": {
+        "verdict": "string",
+        "recommendations": "array"
+      }
+    },
+    {
+      "skill_id": "airguard_forecast",
+      "name": "Get AQI Forecast",
+      "description": "Returns 5-day AQI forecast and risk trend",
+      "endpoint": "/api/forecast",
+      "method": "GET",
+      "parameters": [
+        { "name": "city", "type": "string", "required": true }
+      ],
+      "output_schema": {
+        "forecast": "array",
+        "trend": "string",
+        "preventive_action": "string"
+      }
+    },
+    {
+      "skill_id": "airguard_community",
+      "name": "Get Community Actions",
+      "description": "Returns recommended community-level actions based on current AQI",
+      "endpoint": "/api/community",
+      "method": "GET",
+      "parameters": [
+        { "name": "city", "type": "string", "required": true }
+      ],
+      "output_schema": {
+        "actions": "array",
+        "summary": "string"
+      }
+    },
+    {
+      "skill_id": "airguard_chat",
+      "name": "Ask AirGuard AI",
+      "description": "Answer air quality questions using RAG + IBM watsonx",
+      "endpoint": "/api/chat",
+      "method": "POST",
+      "parameters": [
+        { "name": "question",   "type": "string", "required": true },
+        { "name": "city",       "type": "string", "required": false },
+        { "name": "session_id", "type": "string", "required": false }
+      ],
+      "output_schema": {
+        "answer": "string",
+        "source": "string"
+      }
+    },
+    {
+      "skill_id": "airguard_daily_plan",
+      "name": "Generate Daily Action Plan",
+      "description": "Orchestrates all agents and returns the complete daily air quality action plan",
+      "endpoint": "/api/dashboard",
+      "method": "GET",
+      "parameters": [
+        { "name": "city",        "type": "string", "required": true  },
+        { "name": "age_group",   "type": "string", "required": false },
+        { "name": "activity",    "type": "string", "required": false },
+        { "name": "sensitivity", "type": "string", "required": false }
+      ],
+      "output_schema": {
+        "aqi_data":        "object",
+        "health_advisory": "object",
+        "forecast":        "object",
+        "community":       "object",
+        "daily_plan":      "string"
+      }
+    }
+  ],
+  "automations": [
+    {
+      "automation_id": "daily_aqi_report",
+      "name": "Daily AQI Report",
+      "trigger": "schedule:0 7 * * *",
+      "description": "Every morning at 7 AM — fetch AQI, generate health advisory, send daily plan.",
+      "steps": [
+        { "skill": "airguard_fetch_aqi",    "input": { "city": "{{user.city}}" } },
+        { "skill": "airguard_health_advisory","input": { "city": "{{user.city}}", "age_group": "{{user.age_group}}" } },
+        { "skill": "airguard_daily_plan",   "input": { "city": "{{user.city}}" } }
+      ]
+    },
+    {
+      "automation_id": "aqi_alert_trigger",
+      "name": "AQI Alert Trigger",
+      "trigger": "condition:aqi > 150",
+      "description": "When AQI exceeds 150, automatically generate and deliver an emergency health advisory.",
+      "steps": [
+        { "skill": "airguard_health_advisory", "input": { "city": "{{location}}", "sensitivity": "high" } },
+        { "skill": "airguard_community",       "input": { "city": "{{location}}" } }
+      ]
+    }
+  ],
+  "note": "Configure IBM_ORCHESTRATE_API_KEY in .env to connect to live IBM Orchestrate."
+}

@@ -1,0 +1,126 @@
+{
+  "name": "AirGuard AI — Multi-Agent Workflow",
+  "description": "IBM Langflow workflow definition for the AirGuard AI multi-agent pipeline.",
+  "version": "1.0.0",
+  "note": "Import this file into IBM Langflow (https://langflow.ibm.com) to visualise and run the AI workflow.",
+  "nodes": [
+    {
+      "id": "input_city",
+      "type": "TextInput",
+      "label": "User City Input",
+      "description": "Accepts the city name from the user (e.g. Bhilai, Raipur, Delhi, Mumbai)",
+      "output": "city_string"
+    },
+    {
+      "id": "aqi_data_agent",
+      "type": "PythonFunction",
+      "label": "AQI Data Agent",
+      "description": "Fetches real-time AQI data from WAQI API or uses mock data fallback.",
+      "module": "backend.agents.aqi_agent",
+      "function": "fetch_aqi",
+      "inputs": ["city_string"],
+      "outputs": ["aqi_data_dict"],
+      "ibm_model": null
+    },
+    {
+      "id": "aqi_interpreter",
+      "type": "PromptTemplate",
+      "label": "AQI Interpreter (watsonx)",
+      "description": "Uses IBM watsonx Granite to generate a plain-language AQI interpretation.",
+      "ibm_model": "ibm/granite-13b-instruct-v2",
+      "prompt_template": "Given the AQI data: {aqi_data}. Explain in 2-3 simple sentences what the air quality means for a resident.",
+      "inputs": ["aqi_data_dict"],
+      "outputs": ["aqi_interpretation_text"]
+    },
+    {
+      "id": "user_profile",
+      "type": "StructuredInput",
+      "label": "User Profile Input",
+      "description": "Collects user age group, activity level, and health sensitivity.",
+      "fields": ["age_group", "activity", "sensitivity"],
+      "outputs": ["user_profile_dict"]
+    },
+    {
+      "id": "health_advisory_agent",
+      "type": "PythonFunction",
+      "label": "Health Advisory Agent",
+      "description": "Generates personalized health recommendations based on AQI + user profile.",
+      "module": "backend.agents.health_agent",
+      "function": "get_recommendations",
+      "inputs": ["aqi_data_dict", "user_profile_dict"],
+      "outputs": ["health_advisory_dict"]
+    },
+    {
+      "id": "rag_retriever",
+      "type": "RAGRetriever",
+      "label": "RAG Knowledge Base",
+      "description": "Retrieves relevant air-quality guidance from curated knowledge base.",
+      "module": "backend.rag.knowledge_base",
+      "function": "search_knowledge",
+      "inputs": ["user_query_text"],
+      "outputs": ["kb_context_text"]
+    },
+    {
+      "id": "forecast_agent",
+      "type": "PythonFunction",
+      "label": "Forecasting Agent",
+      "description": "Analyzes AQI trends and predicts next 5 days of air quality risk.",
+      "module": "backend.agents.forecast_agent",
+      "function": "get_forecast",
+      "inputs": ["city_string"],
+      "outputs": ["forecast_dict"]
+    },
+    {
+      "id": "community_agent",
+      "type": "PythonFunction",
+      "label": "Community Action Agent",
+      "description": "Suggests community-level actions based on AQI level.",
+      "module": "backend.agents.community_agent",
+      "function": "get_community_actions",
+      "inputs": ["aqi_data_dict"],
+      "outputs": ["community_dict"]
+    },
+    {
+      "id": "orchestrator",
+      "type": "OrchestratorNode",
+      "label": "Orchestrator / Supervisor Agent (IBM Orchestrate)",
+      "description": "Coordinates all agent outputs and compiles the Daily Action Plan.",
+      "ibm_orchestrate": true,
+      "inputs": [
+        "aqi_data_dict",
+        "aqi_interpretation_text",
+        "health_advisory_dict",
+        "forecast_dict",
+        "community_dict"
+      ],
+      "outputs": ["daily_action_plan_text", "full_dashboard_data"]
+    },
+    {
+      "id": "output_dashboard",
+      "type": "JSONOutput",
+      "label": "Dashboard Output",
+      "description": "Final structured output sent to the frontend dashboard.",
+      "inputs": ["full_dashboard_data"]
+    }
+  ],
+  "edges": [
+    { "from": "input_city",            "to": "aqi_data_agent" },
+    { "from": "aqi_data_agent",        "to": "aqi_interpreter" },
+    { "from": "aqi_data_agent",        "to": "health_advisory_agent" },
+    { "from": "aqi_data_agent",        "to": "community_agent" },
+    { "from": "aqi_data_agent",        "to": "forecast_agent" },
+    { "from": "user_profile",          "to": "health_advisory_agent" },
+    { "from": "aqi_interpreter",       "to": "orchestrator" },
+    { "from": "health_advisory_agent", "to": "orchestrator" },
+    { "from": "forecast_agent",        "to": "orchestrator" },
+    { "from": "community_agent",       "to": "orchestrator" },
+    { "from": "orchestrator",          "to": "output_dashboard" }
+  ],
+  "ibm_config": {
+    "langflow_url": "https://langflow.ibm.com",
+    "orchestrate_url": "https://api.ibm-orchestrate.com",
+    "watsonx_url": "https://us-south.ml.cloud.ibm.com",
+    "model_id": "ibm/granite-13b-instruct-v2",
+    "note": "Set IBM_WATSONX_API_KEY, IBM_WATSONX_PROJECT_ID in .env to activate live IBM models."
+  }
+}
