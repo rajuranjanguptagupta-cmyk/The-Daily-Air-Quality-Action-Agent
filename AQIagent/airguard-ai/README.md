@@ -156,6 +156,13 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Verify the installation before starting the server:
+
+```bash
+python preflight.py
+python test_smoke.py
+```
+
 ### 4. Configure environment variables
 
 ```bash

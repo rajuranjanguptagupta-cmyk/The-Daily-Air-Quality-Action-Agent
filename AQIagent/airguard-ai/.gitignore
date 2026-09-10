@@ -1,0 +1,13 @@
+# Local configuration and runtime data
+.env
+airguard.db
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
